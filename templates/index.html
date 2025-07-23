@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en" class="wf-roboto-n3-active wf-roboto-n4-active wf-roboto-n5-active wf-active">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ask Big D</title>
+  <link rel="icon" href="static/images/favicon-16x16.png" type="image/png">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+  <style>
+      body {
+          background: url('/static/images/davback.jpg') no-repeat center center fixed;
+          background-size: cover;
+          display: flex;
+          justify-content: center;
+          align-items: flex-start; /* Start from the top */
+          min-height: 100vh; /* Adjust to fit content */
+          margin: 0;
+          overflow-y: auto; /* Allows scrolling through the entire page */
+      }
+
+      .container {
+          background: rgba(0, 0, 0, 0.7);
+          padding: 20px;
+          border-radius: 10px;
+          width: 90%;
+          max-width: 1000px; /* Increased width for better graph display */
+          margin-top: 20px; /* Add margin to top for better visibility */
+      }
+
+      .header {
+          text-align: center;
+          margin-bottom: 20px;
+      }
+
+      .header img {
+          border-radius: 50%;
+          margin-bottom: 20px;
+          width: 150px; /* Increase size of the logo */
+          height: 150px; /* Increase size of the logo */
+      }
+
+      .input-field input::placeholder {
+          color: white;
+          opacity: 1;
+      }
+
+      .input-field input {
+          color: white;
+      }
+
+      .input-field input:not(:placeholder-shown) {
+          margin-top: 30px;
+      }
+
+      .input-field label {
+          color: white;
+      }
+
+
+      h2, h5, p {
+          color: white;
+      }
+
+
+      #response {
+          max-height: 300px;
+          overflow-y: auto;
+      }
+
+      h6 {
+          color: white !important;
+          font-size: 1.5em;
+          margin-bottom: 15px;
+      }
+
+      .grid-container {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr); /* Maintain 2 columns */
+          gap: 10px;
+      }
+
+      .grid-item {
+          background: rgba(255, 255, 255, 0.9);
+          padding: 10px;
+          border-radius: 10px;
+      }
+
+      .grid-item img, .grid-item iframe {
+          width: 100%;
+          height: 350px; /* Adjusted height for better visualization */
+          margin-bottom: 20px;
+      }
+
+      .progress {
+          width: 100%;
+          height: 20px;
+          background-color: #e0e0e0;
+          border-radius: 5px;
+          overflow: hidden;
+          margin-top: 10px;
+          position: relative;
+      }
+
+      .progress-bar {
+          height: 100%;
+          width: 0;
+          background-color: #26a69a;
+          transition: width 0.5s; /* Smooth transition for progress bar */
+      }
+
+
+      .loader {
+          border: 4px solid #f3f3f3;
+          border-radius: 50%;
+          border-top: 4px solid #26a69a;
+          width: 30px;
+          height: 30px;
+          animation: spin 1s linear infinite;
+          display: none;
+          margin: 10px auto;
+      }
+
+      @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+      }
+
+      /* Responsive Design Enhancements */
+      @media (max-width: 768px) {
+          .container {
+              width: 95%; /* Expand container width on smaller screens */
+              padding: 15px;
+          }
+
+          .header img {
+              width: 120px; /* Adjust logo size for smaller screens */
+              height: 120px;
+          }
+
+          h6 {
+              font-size: 1.2em;
+          }
+
+          #response {
+              max-height: 200px; /* Reduce response container height */
+          }
+
+          .grid-item img, .grid-item iframe {
+              height: 250px; /* Adjust height of visualizations on smaller screens */
+          }
+      }
+
+      @media (max-width: 480px) {
+          .grid-container {
+              grid-template-columns: 1fr; /* Change to single column for very small screens */
+          }
+
+          .header img {
+              width: 100px; /* Further adjust logo size for very small screens */
+              height: 100px;
+          }
+
+          .grid-item img, .grid-item iframe {
+              height: 200px; /* Further adjust height of visualizations on smaller screens */
+          }
+      }
+  </style>
+</head>
+<body>
+  <div class="container">
+      <div class="header center-align">
+          <img src="/static/images/d.jpg" alt="Big D">
+          <h2>Ask Big D</h2>
+      </div>
+      <form id="pdfForm" method="post" enctype="multipart/form-data" action="/process_pdf">
+          <div class="file-field input-field">
+              <div class="btn">
+                  <span>Choose PDF File</span>
+                  <input type="file" name="pdf" multiple aria-label="Choose PDF File">
+              </div>
+              <div class="file-path-wrapper">
+                  <input class="file-path validate" type="text" placeholder="Upload one or more PDF files">
+              </div>
+          </div>
+          <div class="input-field">
+              <input type="text" id="question" name="question" class="validate" required aria-label="Ask your question">
+              <label for="question">Ask something about the PDF or your knowledge and understanding:</label>
+          </div>
+          <button type="submit" class="btn waves-effect waves-light">Submit</button>
+          <div class="loader" id="loader"></div> <!-- Loader icon -->
+      </form>
+      <div id="response">
+          <h5>Response:</h5>
+          <div class="progress">
+              <div id="progress-bar" class="progress-bar"></div>
+          </div>
+          <p id="response-text"></p>
+          <p id="time-elapsed"></p>
+      </div>
+
+      <!-- Visualization Section -->
+      <div class="grid-container">
+          <div class="grid-item">
+              <h6>Processing Time Graph</h6>
+              <img src="/static/processing_time.png" alt="Processing Time Graph">
+          </div>
+          <div class="grid-item">
+              <h6>Standard Word Cloud</h6>
+              <img src="/static/wordcloud.png" alt="Standard Word Cloud">
+          </div>
+          <div class="grid-item">
+              <h6>3D Tokenization Visualization</h6>
+              <iframe src="/static/3d_visualization.html"></iframe>
+          </div>
+          <div class="grid-item">
+              <h6>Sentiment Analysis</h6>
+              <img src="/static/sentiment_analysis.png" alt="Sentiment Analysis">
+          </div>
+      </div>
+  </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+  <script>
+      document.getElementById('pdfForm').addEventListener('submit', async function (e) {
+          e.preventDefault();
+          const form = e.target;
+          const formData = new FormData(form);
+          const startTime = performance.now();
+          const progressBar = document.getElementById('progress-bar');
+          const loader = document.getElementById('loader');
+          loader.style.display = 'block'; // Show loader
+
+          // Simulate progress update
+          let width = 0;
+          const interval = setInterval(() => {
+              if (width >= 100) {
+                  clearInterval(interval);
+              } else {
+                  width += 1; // Make progress more granular
+                  progressBar.style.width = width + '%';
+              }
+          }, 100); // Faster updates for smoother progress bar
+
+          const response = await fetch(form.action, {
+              method: form.method,
+              body: formData,
+          });
+
+          clearInterval(interval); // Clear progress simulation once the request is done
+          loader.style.display = 'none'; // Hide loader
+
+          const result = await response.json();
+          const endTime = performance.now();
+          const timeElapsed = ((endTime - startTime) / 1000).toFixed(3);
+
+          // Display the bot response
+          document.getElementById('response-text').textContent = result.response;
+          document.getElementById('time-elapsed').textContent = `Time elapsed: ${timeElapsed} seconds`;
+
+          // Update the visualizations
+          const wordCloudImg = document.querySelector('img[src="/static/wordcloud.png"]');
+          const tokenizationIframe = document.querySelector('iframe[src="/static/3d_visualization.html"]');
+          const sentimentImg = document.querySelector('img[src="/static/sentiment_analysis.png"]');
+          const processingTimeImg = document.querySelector('img[src="/static/processing_time.png"]');
+
+
+          if (wordCloudImg) {
+              wordCloudImg.src = '/static/wordcloud.png?' + new Date().getTime();
+          }
+
+
+          if (tokenizationIframe) {
+              tokenizationIframe.src = '/static/3d_visualization.html?' + new Date().getTime();
+          }
+
+          if (sentimentImg) {
+              sentimentImg.src = '/static/sentiment_analysis.png?' + new Date().getTime();
+          }
+
+          if (processingTimeImg) {
+              processingTimeImg.src = '/static/processing_time.png?' + new Date().getTime();
+          }
+
+
+          // Scroll to top of the page after response is shown
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+  </script>
+</body>
+</html>
