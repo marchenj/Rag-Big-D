@@ -33,8 +33,9 @@ nltk.download('wordnet')
 # Set up Flask app
 app = Flask(__name__)
 
-# Set your OpenAI API key and assistant ID
-api_key = "sk-proj-..."
+# Set your OpenAI API key
+api_key = "sk-proj-..."  # Replace with your real key
+
 os.environ["OPENAI_API_KEY"] = api_key  # Set OpenAI API key for use with langchain
 openai.api_key = api_key  # Set OpenAI API key for use with openai library
 
@@ -146,86 +147,103 @@ def index():
 
 @app.route('/process_pdf', methods=['POST'])
 def process_pdf():
-  print("Received files:", request.files)
-  print("Received form data:", request.form)
-  start_time = time.time()
-  uploaded_files = request.files.getlist('pdf')
-  question = request.form.get('question', '')
+  
+    print("Received files:", request.files)
+    print("Received form data:", request.form)
+    start_time = time.time()
+    uploaded_files = request.files.getlist('pdf')
+    question = request.form.get('question', '')
 
-  if not uploaded_files:
-      return jsonify({"response": "No files uploaded.", "processing_time": time.time() - start_time}), 400
+    if not uploaded_files:
+        return jsonify({"response": "No files uploaded.", "processing_time": time.time() - start_time}), 400
 
-  extracted_texts = []
-  for uploaded_file in uploaded_files:
-      extracted_text = extract_text_pypdf_loader(uploaded_file)
-      if extracted_text is None:
-          return jsonify({"response": "Failed to extract text from the provided PDF(s). Please check the file format and content.", "processing_time": time.time() - start_time}), 400
-      extracted_texts.append(extracted_text)
+    extracted_texts = []
+    for uploaded_file in uploaded_files:
+        extracted_text = extract_text_pypdf_loader(uploaded_file)
+        if extracted_text is None:
+            return jsonify({
+                "response": "Failed to extract text from the provided PDF(s). Please check the file format and content.",
+                "processing_time": time.time() - start_time
+            }), 400
+        extracted_texts.append(extracted_text)
 
-  if len(extracted_texts) == 0:
-      return jsonify({"response": "No valid data extracted from files.", "processing_time": time.time() - start_time}), 400
+    if len(extracted_texts) == 0:
+        return jsonify({"response": "No valid data extracted from files.", "processing_time": time.time() - start_time}), 400
 
-  documents = [Document(page_content=text) for text in extracted_texts]
-  text_splitter = RecursiveCharacterTextSplitter(chunk_size=100, chunk_overlap=0)
-  split_texts = text_splitter.split_documents(documents)
+    documents = [Document(page_content=text) for text in extracted_texts]
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+    split_texts = text_splitter.split_documents(documents)
 
-# POINT 2 - Updated embeddings usage
-  embeddings = OpenAIEmbeddings()  
-  doc_texts = [doc.page_content for doc in split_texts]
-  doc_embeddings = embeddings.embed_documents(doc_texts)
+    # POINT 2 - Updated embeddings usage
+    embeddings = OpenAIEmbeddings()
+    doc_texts = [doc.page_content for doc in split_texts]
+    doc_embeddings = embeddings.embed_documents(doc_texts)
 
-  # Improved Query Matching
-  def retrieve_relevant_documents(query):
-      query_embedding = embeddings.embed_query(query)
-      similarities = cosine_similarity([query_embedding], doc_embeddings)
-      
-      # Get top 3 most similar documents
-      most_similar_indices = np.argsort(similarities[0])[::-1][:3]
-      retrieved_texts = [split_texts[idx].page_content for idx in most_similar_indices]
-      return ' '.join(retrieved_texts)  # Combine the top results to provide a richer context
+    # Query Matching
+    def retrieve_relevant_documents(query):
+        query_embedding = embeddings.embed_query(query)
+        similarities = cosine_similarity([query_embedding], doc_embeddings)
+        most_similar_indices = np.argsort(similarities[0])[::-1][:5]
 
+        print("\nTop matching chunks:")
+        for idx in most_similar_indices:
+            print(f"\n--- Chunk {idx} ---\n{split_texts[idx].page_content[:500]}...\n")
 
-  context = retrieve_relevant_documents(question)
+        retrieved_texts = [split_texts[idx].page_content for idx in most_similar_indices]
+        return ' '.join(retrieved_texts)
 
-  # Generate visualizations
-  full_text = " ".join(extracted_texts)
-  processed_text = preprocess_text(full_text)  # Apply text preprocessing
-  generate_word_cloud(processed_text)
-  plot_3d_tokenization(processed_text)
-  sentiment_analysis(processed_text)
+    context = retrieve_relevant_documents(question)
 
+    # Generate visualizations
+    full_text = " ".join(extracted_texts)
+    processed_text = preprocess_text(full_text)
+    generate_word_cloud(processed_text)
+    plot_3d_tokenization(processed_text)
+    sentiment_analysis(processed_text)
 
-# Point 3 - Updated OpenAI API call
-  # Generate a response using OpenAI API
-  response = client.chat.completions.create(
-      model="gpt-4o",
-      messages=[
-          {
-              "role": "system",
-              "content": "You are an assistant who analyzes documents and answers questions based on the content provided."
-          },
-          {
-              "role": "user",
-              "content": f"I have a document that I need help analyzing. The context is: {context}. Here is my question: {question}. Please provide relevant insights or information based on the document."
-          }
-      ]
-  )
+    # Point 3 - Updated OpenAI API call
+    # Generate a response using OpenAI API
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You are a helpful and precise assistant that answers questions only using the provided document. "
+                    "Avoid assumptions or general knowledge. Prioritize clarity, structure, and document-grounded insights. "
+                    "If the answer is not explicitly found, state that."
+                )
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"### Document Content:\n\n{context}\n\n"
+                    f"### Question:\n\n{question}\n\n"
+                    "### Instructions:\n"
+                    "1. Answer using only the document content.\n"
+                    "2. Use bullet points or numbered lists when applicable.\n"
+                    "3. Cite specific phrases or examples from the document.\n"
+                    "4. Be concise and informative.\n"
+                    "5. If the answer is not clearly listed, try to infer it from related content without guessing."
+                )
+            }
+        ]
+    )
 
-  # Extract the response from the API 
-  response_content = response.choices[0].message.content
-  end_time = time.time()
-  processing_time = end_time - start_time
+    # Extract the response from the API 
+    response_content = response.choices[0].message.content
+    end_time = time.time()
+    processing_time = end_time - start_time
 
-  # Append the new processing time to the list
-  processing_times.append(processing_time)
+    # Append the new processing time to the list
+    processing_times.append(processing_time)
 
-  # Update the processing time graph
-  update_processing_time_graph(processing_times)
+    # Update the processing time graph
+    update_processing_time_graph(processing_times)
 
-  # Return the response from OpenAI API
-  return jsonify({"response": response_content, "processing_time": processing_time})
-
+    # Return the response from OpenAI API
+    return jsonify({"response": response_content, "processing_time": processing_time})
 
 if __name__ == '__main__':
-  from waitress import serve
-  serve(app, host='0.0.0.0', port=8080)
+    from waitress import serve
+    serve(app, host='0.0.0.0', port=8080)

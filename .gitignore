@@ -1,3 +1,6 @@
 .vercel
+<<<<<<< HEAD
 venv/
 .DS_Store
+=======
+>>>>>>> d44e670 (Updated OpenAI libraries and removed deprecated tools to support GPT-4o. Enhanced preprocessing and improved prompting for more accurate chatbot results.)
